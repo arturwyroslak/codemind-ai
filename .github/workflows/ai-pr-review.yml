@@ -1,0 +1,29 @@
+name: CodeMind AI - Advanced PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  ai_pr_review:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Call CodeMind AI advanced PR review
+        env:
+          CODEMIND_API_URL: ${{ secrets.CODEMIND_API_URL }}
+          CODEMIND_API_TOKEN: ${{ secrets.CODEMIND_API_TOKEN }}
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          REPO_FULL_NAME="${{ github.repository }}"
+
+          curl -X POST "${CODEMIND_API_URL}/api/v1/advanced/pr-review" \
+            -H "Authorization: Bearer ${CODEMIND_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"repository\": \"${REPO_FULL_NAME}\", \"pr_number\": ${PR_NUMBER}, \"action_type\": \"pr_review\"}"
