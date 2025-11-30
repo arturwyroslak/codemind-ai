@@ -1,0 +1,319 @@
+# Advanced Docker Compose for production deployment
+version: '3.8'
+
+x-shared: &shared
+  restart: unless-stopped
+  networks:
+    - codemind-network
+
+services:
+  # Ray Head Node (Swarm Orchestration)
+  ray-head:
+    <<: *shared
+    image: rayproject/ray:latest
+    container_name: codemind-ray-head
+    command: ray start --head --port=6379 --dashboard-host=0.0.0.0 --dashboard-port=8265
+    ports:
+      - "6379:6379"
+      - "8265:8265"
+    environment:
+      - RAY_ADDRESS=ray://ray-head:10001
+    volumes:
+      - ray_data:/ray
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+
+  # Ray Worker Nodes
+  ray-worker-1:
+    <<: *shared
+    image: rayproject/ray:latest
+    container_name: codemind-ray-worker-1
+    command: ray start --address=ray-head:6379
+    environment:
+      - RAY_ADDRESS=ray://ray-head:10001
+    volumes:
+      - ray_data:/ray
+    depends_on:
+      - ray-head
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+
+  ray-worker-2:
+    <<: *shared
+    image: rayproject/ray:latest
+    container_name: codemind-ray-worker-2
+    command: ray start --address=ray-head:6379
+    environment:
+      - RAY_ADDRESS=ray://ray-head:10001
+    volumes:
+      - ray_data:/ray
+    depends_on:
+      - ray-head
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+
+  # Weaviate Vector Database (Multimodal)
+  weaviate:
+    <<: *shared
+    image: semitechnologies/weaviate:1.21.0
+    container_name: codemind-weaviate
+    ports:
+      - "8080:8080"
+      - "50051:50051"
+    command:
+      - --host
+      - 0.0.0.0
+      - --port
+      - 8080
+      - --scheme
+      - http
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none'
+      ENABLE_MODULES: 'text2vec-openai,generative-openai,qna-transformers'
+      CLUSTER_HOSTNAME: 'node1'
+      OPENAI_APIKEY: ${OPENAI_API_KEY}
+      TRANSFORMERS_INFERENCE_API: 'http://sentence-transformers:7080'
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 8G
+
+  # Sentence Transformers for local embeddings
+  sentence-transformers:
+    <<: *shared
+    image: semitechnologies/transformers-inference:sentence-transformers-cpu
+    container_name: codemind-sentence-transformers
+    environment:
+      ENABLE_CUDA: 'false'
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+
+  # Advanced Backend API
+  backend:
+    <<: *shared
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.advanced
+    container_name: codemind-backend-advanced
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/codemind
+      - REDIS_URL=redis://redis:6379/0
+      - RAY_ADDRESS=ray://ray-head:10001
+      - WEAVIATE_URL=http://weaviate:8080
+      - WEAVIATE_API_KEY=${WEAVIATE_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - PLUGIN_DIR=/app/plugins
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app
+      - ./plugins:/app/plugins
+    depends_on:
+      - postgres
+      - redis
+      - ray-head
+      - weaviate
+    command: >
+      sh -c "
+        ray stop --force;
+        sleep 2;
+        uvicorn app.advanced_features:api_app --host 0.0.0.0 --port 8000 --reload
+      "
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+
+  # Frontend with advanced features
+  frontend:
+    <<: *shared
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: codemind-frontend-advanced
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_WEAVIATE_URL=http://localhost:8080
+      - VITE_RAY_DASHBOARD=http://localhost:8265
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    command: npm run dev
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+
+  # PostgreSQL with advanced extensions
+  postgres:
+    <<: *shared
+    image: pgvector/pgvector:pg16
+    container_name: codemind-postgres-advanced
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=codemind
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+
+  # Redis with persistence
+  redis:
+    <<: *shared
+    image: redis:7-alpine
+    container_name: codemind-redis-advanced
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+
+  # MLflow for experiment tracking
+  mlflow:
+    <<: *shared
+    image: ghcr.io/mlflow/mlflow:v2.8.1
+    container_name: codemind-mlflow
+    ports:
+      - "5000:5000"
+    command: mlflow server --backend-store-uri postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/mlflow --default-artifact-root ./mlruns --host 0.0.0.0
+    environment:
+      - MLFLOW_S3_ENDPOINT_URL
+    volumes:
+      - mlflow_data:/mlruns
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+
+  # Prometheus for monitoring
+  prometheus:
+    <<: *shared
+    image: prom/prometheus:latest
+    container_name: codemind-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+
+  # Grafana for visualization
+  grafana:
+    <<: *shared
+    image: grafana/grafana:latest
+    container_name: codemind-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+
+  # Loki for logs
+  loki:
+    <<: *shared
+    image: grafana/loki:latest
+    container_name: codemind-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./monitoring/loki-config.yaml:/etc/loki/local-config.yaml
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+
+  # Promtail for log shipping
+  promtail:
+    <<: *shared
+    image: grafana/promtail:latest
+    container_name: codemind-promtail
+    volumes:
+      - ./monitoring/promtail-config.yml:/etc/promtail/config.yml
+      - /var/log:/var/log
+    command: -config.file=/etc/promtail/config.yml
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 512M
+
+volumes:
+  ray_data:
+  weaviate_data:
+  postgres_data:
+  redis_data:
+  mlflow_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  codemind-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
