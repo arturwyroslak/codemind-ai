@@ -1,0 +1,136 @@
+{
+  "name": "CodeMind AI",
+  "displayName": "CodeMind AI",
+  "description": "AI-powered code analysis and suggestions directly in VS Code",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:python",
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:java",
+    "onLanguage:cpp",
+    "onLanguage:go",
+    "onLanguage:rust",
+    "onCommand:codemind.analyzeSelection",
+    "onCommand:codemind.analyzeFile",
+    "onCommand:codemind.applyFix"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codemind.analyzeSelection",
+        "title": "CodeMind: Analyze Selection",
+        "category": "CodeMind"
+      },
+      {
+        "command": "codemind.analyzeFile",
+        "title": "CodeMind: Analyze Current File",
+        "category": "CodeMind"
+      },
+      {
+        "command": "codemind.applyFix",
+        "title": "CodeMind: Apply Suggested Fix",
+        "category": "CodeMind"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "codemind.analyzeSelection",
+          "group": "CodeMind",
+          "when": "editorHasSelection"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "codemind.analyzeFile",
+          "group": "CodeMind",
+          "when": "resourceFilename =~ /\\.(py|js|ts|jsx|tsx|java|cpp|c|h|go|rs)$/"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "CodeMind AI",
+      "properties": {
+        "codemind.apiUrl": {
+          "type": "string",
+          "default": "https://api.codemind.ai",
+          "description": "CodeMind AI API endpoint URL"
+        },
+        "codemind.apiToken": {
+          "type": "string",
+          "default": "",
+          "description": "CodeMind AI API token (JWT)",
+          "scope": "application"
+        },
+        "codemind.analysisType": {
+          "type": "string",
+          "default": "full",
+          "description": "Type of analysis: security, performance, architecture, full",
+          "enum": ["security", "performance", "architecture", "full"]
+        },
+        "codemind.enableInlineDiagnostics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show AI suggestions as inline diagnostics"
+        },
+        "codemind.autoAnalyzeOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically analyze file on save"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/node": "16.x",
+    "@typescript-eslint/eslint-plugin": "^5.45.0",
+    "@typescript-eslint/parser": "^5.45.0",
+    "eslint": "^8.28.0",
+    "typescript": "^4.9.4",
+    "vsce": "^2.15.0",
+    "@vscode/test-electron": "^2.3.2"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arturwyroslak/codemind-ai"
+  },
+  "bugs": {
+    "url": "https://github.com/arturwyroslak/codemind-ai/issues"
+  },
+  "homepage": "https://github.com/arturwyroslak/codemind-ai/tree/main/vscode-extension",
+  "publisher": "codemind-ai",
+  "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#2d74c7",
+    "theme": "dark"
+  },
+  "keywords": [
+    "AI",
+    "code analysis",
+    "code review",
+    "security",
+    "performance",
+    "refactoring"
+  ],
+  "license": "MIT"
+}
