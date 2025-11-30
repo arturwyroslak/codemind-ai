@@ -57,6 +57,102 @@ Interactive interface for advanced users:
 - **Template Library**: Pre-built prompt recipes for common tasks
 - **Analytics Dashboard**: Track prompt effectiveness metrics
 
+## GitHub Actions Integration
+
+CodeMind AI może automatycznie analizować Pull Requests i dodawać inteligentne komentarze z sugestiami. Integracja wykorzystuje GitHub Actions do wywołania backendu AI przy każdym PR.
+
+### Wymagania
+
+- Backend CodeMind AI uruchomiony i dostępny publicznie (lub przez VPN)
+- Endpoint `/api/v1/advanced/pr-review` zintegrowany z GitHubActionsPlugin
+- Permissions: `pull-requests: write`, `contents: read`
+
+### Konfiguracja Secrets
+
+W Settings > Secrets and variables > Actions dodaj:
+
+- `CODEMIND_API_URL`: URL do backendu (np. `https://api.codemind.ai`)
+- `CODEMIND_API_TOKEN`: JWT token lub API key do autoryzacji
+- `GITHUB_TOKEN`: Automatycznie dostępny (dla permissions)
+
+### Workflow GitHub Actions
+
+Plik `.github/workflows/ai-pr-review.yml` uruchamia się automatycznie:
+
+1. **Trigger**: PR opened, synchronize, reopened
+2. **Action**: Wywołuje backend z danymi PR (repo, numer)
+3. **Response**: AI analizuje diff, dodaje komentarze inline
+4. **Output**: Status analizy + score jakości PR
+
+### Endpoint Specification
+
+**POST** `/api/v1/advanced/pr-review`
+
+**Headers**:
+- `Authorization: Bearer {CODEMIND_API_TOKEN}`
+- `Content-Type: application/json`
+
+**Body**:
+```json
+{
+  "repository": "owner/repo",
+  "pr_number": 123,
+  "action_type": "pr_review",
+  "context": {
+    "language": "python",
+    "project_type": "web_app",
+    "plugins": ["github_actions"]
+  }
+}
+```
+
+**Response**:
+```json
+{
+  "status": "success",
+  "pr_analysis": {
+    "overall_score": 85.5,
+    "files_analyzed": 5,
+    "issues_found": 12,
+    "comments_posted": 8,
+    "execution_time": 2.3
+  },
+  "audit_id": "audit_123456",
+  "recommendations": [
+    "Fix SQL injection in auth.py:line 42",
+    "Add error handling in api/routes.py"
+  ]
+}
+```
+
+### Przykładowy Przepływ
+
+1. **Developer** otwiera PR z nowymi funkcjami
+2. **GitHub Actions** wykrywa event i uruchamia workflow
+3. **CodeMind AI** analizuje diff używając swarm agents:
+   - SecurityAgent: SQL injection, XSS
+   - PerformanceAgent: N+1 queries, memory leaks
+   - ArchitectureAgent: SOLID principles
+4. **Komentarze** pojawiają się inline w PR z:
+   - Severity (critical/high/medium)
+   - Sugestie fixów (code snippets)
+   - Impact na score PR
+5. **Dashboard** pokazuje historyczne trendy jakości PR
+
+### Troubleshooting
+
+- **401 Unauthorized**: Sprawdź `CODEMIND_API_TOKEN` w secrets
+- **Timeout**: Zwiększ timeout w workflow (domyślnie 10min)
+- **No comments**: Upewnij się, że backend ma permissions do pisania w PR
+- **High risk blocked**: Privacy layer zablokował analizę (sekrety w kodzie)
+
+### Rozszerzenia
+
+- **Custom agents**: Dodaj własne pluginy dla specyficznych frameworków
+- **Slack notifications**: Powiadomienia o critical issues
+- **Jira integration**: Automatyczne tikety z findings
+- **Performance metrics**: Trackuj średni score PR w czasie
+
 ## Technical Implementation
 
 ### Backend Enhancements
