@@ -1,40 +1,82 @@
-import React, { useState } from 'react'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import { Toaster } from 'react-hot-toast'
-import Navbar from './components/Navbar'
-import Sidebar from './components/Sidebar'
-import CodeAnalysis from './pages/CodeAnalysis'
-import CodeGeneration from './pages/CodeGeneration'
-import RAGQuery from './pages/RAGQuery'
-import Dashboard from './pages/Dashboard'
-import Settings from './pages/Settings'
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  Container,
+  Box,
+  Button,
+  ThemeProvider,
+  createTheme,
+  CssBaseline
+} from '@mui/material';
+import { Code, GitHub, Analytics } from '@mui/icons-material';
+
+import AdvancedAnalysis from './components/AdvancedAnalysis';
+import PRReview from './components/PRReview';
+
+const theme = createTheme({
+  palette: {
+    mode: 'dark',
+    primary: {
+      main: '#2d74c7',
+    },
+    secondary: {
+      main: '#f50057',
+    },
+  },
+});
 
 function App() {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-
   return (
-    <Router>
-      <div className="flex h-screen bg-slate-900 text-white">
-        <Toaster position="top-right" />
-        
-        <Sidebar isOpen={sidebarOpen} />
-        
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <Navbar onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
-          
-          <main className="flex-1 overflow-auto p-6">
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Router>
+        <Box sx={{ flexGrow: 1 }}>
+          <AppBar position="static">
+            <Toolbar>
+              <Code sx={{ mr: 2 }} />
+              <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+                CodeMind AI
+              </Typography>
+              <Button color="inherit" component={Link} to="/">
+                <Analytics sx={{ mr: 1 }} /> Analysis
+              </Button>
+              <Button color="inherit" component={Link} to="/pr-review">
+                <GitHub sx={{ mr: 1 }} /> PR Review
+              </Button>
+            </Toolbar>
+          </AppBar>
+
+          <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
             <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/analyze" element={<CodeAnalysis />} />
-              <Route path="/generate" element={<CodeGeneration />} />
-              <Route path="/query" element={<RAGQuery />} />
-              <Route path="/settings" element={<Settings />} />
+              <Route path="/" element={<AdvancedAnalysis />} />
+              <Route path="/pr-review" element={<PRReview />} />
             </Routes>
-          </main>
-        </div>
-      </div>
-    </Router>
-  )
+          </Container>
+
+          <Box
+            component="footer"
+            sx={{
+              py: 3,
+              px: 2,
+              mt: 'auto',
+              backgroundColor: (theme) =>
+                theme.palette.mode === 'light'
+                  ? theme.palette.grey[200]
+                  : theme.palette.grey[900],
+              textAlign: 'center'
+            }}
+          >
+            <Typography variant="body2" color="text.secondary">
+              Made with ❤️ and 🤖 by CodeMind AI Team
+            </Typography>
+          </Box>
+        </Box>
+      </Router>
+    </ThemeProvider>
+  );
 }
 
-export default App
+export default App;
